@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"text/template"
 
-	"github.com/resmoio/kubernetes-event-exporter/pkg/kube"
 	"github.com/Masterminds/sprig/v3"
+	"github.com/resmoio/kubernetes-event-exporter/pkg/kube"
 )
 
 func GetString(event *kube.EnhancedEvent, text string) (string, error) {
@@ -88,6 +88,15 @@ func serializeEventWithLayout(layout map[string]interface{}, ev *kube.EnhancedEv
 		res, err := convertLayoutTemplate(layout, ev)
 		if err != nil {
 			return nil, err
+		}
+
+		// Check if 'message' exists and is a string
+		if rawMessage, ok := res["message"].(string); ok {
+			var unmarshaledMessage interface{}
+			if err := json.Unmarshal([]byte(rawMessage), &unmarshaledMessage); err == nil {
+				// If unmarshal succeeds, replace the message with parsed JSON
+				res["message"] = unmarshaledMessage
+			}
 		}
 
 		toSend, err = json.Marshal(res)
