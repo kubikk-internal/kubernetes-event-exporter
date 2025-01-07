@@ -99,11 +99,10 @@ func serializeEventWithLayout(layout map[string]interface{}, ev *kube.EnhancedEv
 			return nil, err
 		}
 
-		// Check if 'message' exists and is a string
-		if rawMessage, ok := res["message"].(string); ok {
+		// Detect and parse 'message' if it's escaped JSON
+		if rawMessage, ok := res["message"].(string); ok && json.Valid([]byte(rawMessage)) {
 			var unmarshaledMessage interface{}
 			if err := json.Unmarshal([]byte(rawMessage), &unmarshaledMessage); err == nil {
-				// If unmarshal succeeds, replace the message with parsed JSON
 				res["message"] = unmarshaledMessage
 			}
 		}
