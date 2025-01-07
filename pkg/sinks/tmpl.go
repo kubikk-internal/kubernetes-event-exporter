@@ -16,13 +16,22 @@ func GetString(event *kube.EnhancedEvent, text string) (string, error) {
 	}
 
 	buf := new(bytes.Buffer)
-	// TODO: Should we send event directly or more events?
 	err = tmpl.Execute(buf, event)
 	if err != nil {
 		return "", err
 	}
 
-	return buf.String(), nil
+	// Try to unmarshal if it's a JSON string
+	unescaped := buf.String()
+	var parsedMessage interface{}
+	if json.Unmarshal([]byte(unescaped), &parsedMessage) == nil {
+		// Return unmarshaled JSON string
+		if marshaled, err := json.Marshal(parsedMessage); err == nil {
+			return string(marshaled), nil
+		}
+	}
+
+	return unescaped, nil
 }
 
 func convertLayoutTemplate(layout map[string]interface{}, ev *kube.EnhancedEvent) (map[string]interface{}, error) {
