@@ -1,0 +1,73 @@
+name: Build and Push Go App
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - release/**
+      - feature/**
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Go 1.20
+      uses: actions/setup-go@v3
+      with:
+        go-version: "1.20"
+      id: go
+
+    - name: Build
+      run: go build -v .
+
+    - name: Test
+      run: go test ./...
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v1
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Prepare
+      id: prep
+      run: |
+        BRANCH_NAME_UNDERSCORES=${GITHUB_REF_NAME////} # Replace '/' with ''
+        BRANCH_NAME=${BRANCH_NAME_UNDERSCORES,,} # Convert to lowercase
+        COMMIT=${GITHUB_SHA::6} # Get the short SHA
+        echo "BRANCH_NAME=${BRANCH_NAME}" >> "$GITHUB_ENV"
+        echo "COMMIT=${COMMIT}" >> "$GITHUB_ENV"
+
+    - name: Print env vars
+      id: print_env
+      run: |
+        printf 'REGISTRY: %s\n' "$REGISTRY"
+        printf 'IMAGE_NAME: %s\n' "$IMAGE_NAME"
+        printf 'BRANCH_NAME: %s\n' "$BRANCH_NAME"
+        printf 'COMMIT: %s\n' "$COMMIT"
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v3
+      with:
+        context: .
+        push: true
+        platforms: linux/amd64,linux/arm64
+        tags: |
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.BRANCH_NAME }}
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.COMMIT }}
+        labels: |
+          org.opencontainers.image.source=${{ github.repositoryUrl }}
